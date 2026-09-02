@@ -147,17 +147,60 @@ services:
       backend:
         ipv4_address: ${MAP_SERVICE_IP}
 
-  socket-proxy:
+  socket-proxy-login:
     image: ${RATHENA_SOCKET_PROXY_IMAGE}
+    build:
+      context: ./socket-proxy
+      dockerfile: Dockerfile
+      args:
+        WEBSOCKIFY_VERSION: ${RATHENA_SOCKET_PROXY_VERSION}
     restart: unless-stopped
     depends_on:
       login:
         condition: service_started
     command:
-      - ${RATHENA_SOCKET_PROXY_LISTEN}
-      - ${RATHENA_SOCKET_PROXY_TARGET_HOST}:${RATHENA_SOCKET_PROXY_TARGET_PORT}
+      - ${RATHENA_SOCKET_PROXY_LOGIN_LISTEN}
+      - ${RATHENA_SOCKET_PROXY_LOGIN_TARGET_HOST}:${RATHENA_SOCKET_PROXY_LOGIN_TARGET_PORT}
     ports:
-      - "${RATHENA_SOCKET_PROXY_BIND_IP}:${RATHENA_SOCKET_PROXY_BIND_PORT}:${RATHENA_SOCKET_PROXY_PORT}"
+      - "${RATHENA_SOCKET_PROXY_BIND_IP}:${RATHENA_SOCKET_PROXY_LOGIN_BIND_PORT}:${RATHENA_SOCKET_PROXY_LOGIN_PORT}"
+    networks:
+      backend:
+
+  socket-proxy-char:
+    image: ${RATHENA_SOCKET_PROXY_IMAGE}
+    build:
+      context: ./socket-proxy
+      dockerfile: Dockerfile
+      args:
+        WEBSOCKIFY_VERSION: ${RATHENA_SOCKET_PROXY_VERSION}
+    restart: unless-stopped
+    depends_on:
+      char:
+        condition: service_started
+    command:
+      - ${RATHENA_SOCKET_PROXY_CHAR_LISTEN}
+      - ${RATHENA_SOCKET_PROXY_CHAR_TARGET_HOST}:${RATHENA_SOCKET_PROXY_CHAR_TARGET_PORT}
+    ports:
+      - "${RATHENA_SOCKET_PROXY_BIND_IP}:${RATHENA_SOCKET_PROXY_CHAR_BIND_PORT}:${RATHENA_SOCKET_PROXY_CHAR_PORT}"
+    networks:
+      backend:
+
+  socket-proxy-map:
+    image: ${RATHENA_SOCKET_PROXY_IMAGE}
+    build:
+      context: ./socket-proxy
+      dockerfile: Dockerfile
+      args:
+        WEBSOCKIFY_VERSION: ${RATHENA_SOCKET_PROXY_VERSION}
+    restart: unless-stopped
+    depends_on:
+      map:
+        condition: service_started
+    command:
+      - ${RATHENA_SOCKET_PROXY_MAP_LISTEN}
+      - ${RATHENA_SOCKET_PROXY_MAP_TARGET_HOST}:${RATHENA_SOCKET_PROXY_MAP_TARGET_PORT}
+    ports:
+      - "${RATHENA_SOCKET_PROXY_BIND_IP}:${RATHENA_SOCKET_PROXY_MAP_BIND_PORT}:${RATHENA_SOCKET_PROXY_MAP_PORT}"
     networks:
       backend:
 
