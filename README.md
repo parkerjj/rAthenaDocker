@@ -14,10 +14,14 @@ Requirements:
 - `ro.io-ft.com` resolves to the server address used by the client.
 - Allow TCP ports 6900, 6121, and 5121 through the server firewall/router.
 
+For Dokploy, create a GitHub project from this repository and select the
+root-level `docker-compose.yml`. The repository is server-only; it does not
+contain or mount ROWeb client resources.
+
 Deploy on the Pi:
 
 ```sh
-cd /rAthena/deploy/rathena-pi
+cd /path/to/rathenaDocker
 chmod 600 .env
 docker compose up -d --build
 ```
