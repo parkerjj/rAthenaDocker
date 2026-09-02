@@ -147,6 +147,20 @@ services:
       backend:
         ipv4_address: ${MAP_SERVICE_IP}
 
+  socket-proxy:
+    image: ${RATHENA_SOCKET_PROXY_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      login:
+        condition: service_started
+    command:
+      - ${RATHENA_SOCKET_PROXY_LISTEN}
+      - ${RATHENA_SOCKET_PROXY_TARGET_HOST}:${RATHENA_SOCKET_PROXY_TARGET_PORT}
+    ports:
+      - "${RATHENA_SOCKET_PROXY_BIND_IP}:${RATHENA_SOCKET_PROXY_BIND_PORT}:${RATHENA_SOCKET_PROXY_PORT}"
+    networks:
+      backend:
+
 networks:
   backend:
     ipam:
