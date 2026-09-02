@@ -1,0 +1,154 @@
+name: ${COMPOSE_PROJECT_NAME}
+
+x-rathena-image: &rathena-image
+  image: ${RATHENA_IMAGE}
+  build:
+    context: ./rathena
+    dockerfile: Dockerfile
+    args:
+      RATHENA_REF: ${RATHENA_REF}
+      PACKETVER: ${PACKETVER}
+      PACKET_OBFUSCATION_KEY1: ${PACKET_OBFUSCATION_KEY1}
+      PACKET_OBFUSCATION_KEY2: ${PACKET_OBFUSCATION_KEY2}
+      PACKET_OBFUSCATION_KEY3: ${PACKET_OBFUSCATION_KEY3}
+  environment:
+    RATHENA_DB_NAME: ${RATHENA_DB_NAME}
+    RATHENA_DB_USER: ${RATHENA_DB_USER}
+    RATHENA_DB_PASSWORD: ${RATHENA_DB_PASSWORD}
+    RATHENA_NEW_ACCOUNT: ${RATHENA_NEW_ACCOUNT}
+    RATHENA_USE_MD5_PASSWORDS: ${RATHENA_USE_MD5_PASSWORDS}
+    RATHENA_CLIENT_HASH_CHECK: ${RATHENA_CLIENT_HASH_CHECK}
+    RATHENA_PINCODE_ENABLED: ${RATHENA_PINCODE_ENABLED}
+    RATHENA_PINCODE_FORCE: ${RATHENA_PINCODE_FORCE}
+    RATHENA_LOGIN_SERVICE_HOST: ${RATHENA_LOGIN_SERVICE_HOST}
+    RATHENA_CHAR_SERVICE_HOST: ${RATHENA_CHAR_SERVICE_HOST}
+    RATHENA_LOGIN_PORT: ${RATHENA_LOGIN_PORT}
+    RATHENA_CHAR_PORT: ${RATHENA_CHAR_PORT}
+    RATHENA_MAP_PORT: ${RATHENA_MAP_PORT}
+    RATHENA_CHAR_ADVERTISE_HOST: ${RATHENA_CHAR_ADVERTISE_HOST}
+    RATHENA_MAP_ADVERTISE_HOST: ${RATHENA_MAP_ADVERTISE_HOST}
+    RATHENA_RENDER_CONFIGS: "no"
+  networks:
+    backend:
+
+services:
+  db:
+    image: ${MARIADB_IMAGE}
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${RATHENA_DB_NAME}
+      MARIADB_USER: ${RATHENA_DB_USER}
+      MARIADB_PASSWORD: ${RATHENA_DB_PASSWORD}
+    command:
+      - --character-set-server=${MARIADB_CHARACTER_SET}
+      - --collation-server=${MARIADB_COLLATION}
+    volumes:
+      - ${RATHENA_DB_DATA_DIR}:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u root -p$$MARIADB_ROOT_PASSWORD --silent"]
+      interval: ${DB_HEALTHCHECK_INTERVAL}
+      timeout: ${DB_HEALTHCHECK_TIMEOUT}
+      retries: ${DB_HEALTHCHECK_RETRIES}
+      start_period: ${DB_HEALTHCHECK_START_PERIOD}
+    networks:
+      backend:
+
+  config-init:
+    <<: *rathena-image
+    restart: "no"
+    volumes:
+      - ${RATHENA_CONFIG_DIR}:/config
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /config/import
+        for template in /config/templates/import/*.tpl; do
+          target="/config/import/$$(basename "$$template" .tpl)"
+          envsubst < "$$template" > "$$target.tmp"
+          mv "$$target.tmp" "$$target"
+          chmod ${RATHENA_CONFIG_FILE_MODE} "$$target"
+        done
+        chmod ${RATHENA_CONFIG_DIR_MODE} /config /config/import
+
+  db-init:
+    <<: *rathena-image
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        if mariadb -h db -u "$$RATHENA_DB_USER" -p"$$RATHENA_DB_PASSWORD" "$$RATHENA_DB_NAME" --batch --skip-column-names -e "SHOW TABLES LIKE 'login'" | grep -qx login; then
+          exit 0
+        fi
+        for file in /opt/rathena/sql-files/*.sql; do
+          mariadb -h db -u "$$RATHENA_DB_USER" -p"$$RATHENA_DB_PASSWORD" "$$RATHENA_DB_NAME" < "$$file"
+        done
+
+  login:
+    <<: *rathena-image
+    restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+      db-init:
+        condition: service_completed_successfully
+    command: ["./login-server"]
+    ports:
+      - "${RATHENA_BIND_IP}:${RATHENA_LOGIN_BIND_PORT}:${RATHENA_LOGIN_PORT}"
+    volumes:
+      - ${RATHENA_CONFIG_DIR}/import:/opt/rathena/conf/import:ro
+      - ${RATHENA_LOG_DIR}:/opt/rathena/log
+    networks:
+      backend:
+        ipv4_address: ${LOGIN_SERVICE_IP}
+
+  char:
+    <<: *rathena-image
+    restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+      db-init:
+        condition: service_completed_successfully
+      login:
+        condition: service_started
+    command: ["./char-server"]
+    ports:
+      - "${RATHENA_BIND_IP}:${RATHENA_CHAR_BIND_PORT}:${RATHENA_CHAR_PORT}"
+    volumes:
+      - ${RATHENA_CONFIG_DIR}/import:/opt/rathena/conf/import:ro
+      - ${RATHENA_LOG_DIR}:/opt/rathena/log
+    networks:
+      backend:
+        ipv4_address: ${CHAR_SERVICE_IP}
+
+  map:
+    <<: *rathena-image
+    restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+      db-init:
+        condition: service_completed_successfully
+      char:
+        condition: service_started
+    command: ["./map-server"]
+    ports:
+      - "${RATHENA_BIND_IP}:${RATHENA_MAP_BIND_PORT}:${RATHENA_MAP_PORT}"
+    volumes:
+      - ${RATHENA_CONFIG_DIR}/import:/opt/rathena/conf/import:ro
+      - ${RATHENA_LOG_DIR}:/opt/rathena/log
+    networks:
+      backend:
+        ipv4_address: ${MAP_SERVICE_IP}
+
+networks:
+  backend:
+    ipam:
+      config:
+        - subnet: ${BACKEND_SUBNET}

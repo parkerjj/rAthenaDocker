@@ -1,0 +1,6 @@
+login_ip: ${RATHENA_LOGIN_SERVICE_HOST}
+login_port: ${RATHENA_LOGIN_PORT}
+char_ip: ${RATHENA_CHAR_ADVERTISE_HOST}
+char_port: ${RATHENA_CHAR_PORT}
+pincode_enabled: ${RATHENA_PINCODE_ENABLED}
+pincode_force: ${RATHENA_PINCODE_FORCE}

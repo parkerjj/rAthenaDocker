@@ -1,0 +1,4 @@
+char_ip: ${RATHENA_CHAR_SERVICE_HOST}
+char_port: ${RATHENA_CHAR_PORT}
+map_ip: ${RATHENA_MAP_ADVERTISE_HOST}
+map_port: ${RATHENA_MAP_PORT}
